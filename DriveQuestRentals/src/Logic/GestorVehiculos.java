@@ -1,104 +1,90 @@
 package gestor;
 
-import model.Vehiculo;
-import model.VehiculoCarga;
-import model.VehiculosPasajeros;
-
-import java.io.*;
+import model.*;
 import java.util.*;
+import java.io.*;
 
 public class GestorVehiculos {
+    private static List<Vehiculo> vehiculos = Collections.synchronizedList(new ArrayList<>());
+    private static Set<String> patentesRegistradas = new HashSet<>();
+    private static final String RUTA = "vehiculos.txt";
 
-    private Map<String, Vehiculo> mapaVehiculos;
-
-    public GestorVehiculos() {
-        this.mapaVehiculos = new HashMap<>();
+    static {
+        cargarDesdeArchivo();
     }
 
-    public boolean agregarVehiculo(Vehiculo v) {
-        if (mapaVehiculos.containsKey(v.getPatente())) {
-            System.out.println("❌ Error: La patente ya está registrada.");
+    public static boolean agregarVehiculo(Vehiculo v) {
+        if (patentesRegistradas.contains(v.getPatente())) {
+            System.out.println("ERROR: Patente duplicada.");
             return false;
         }
-        mapaVehiculos.put(v.getPatente(), v);
+        vehiculos.add(v);
+        patentesRegistradas.add(v.getPatente());
+        guardarEnArchivo();
         return true;
     }
 
-    public Collection<Vehiculo> obtenerVehiculos() {
-        return mapaVehiculos.values();
-    }
-
-    public List<Vehiculo> obtenerVehiculosCarga() {
-        List<Vehiculo> carga = new ArrayList<>();
-        for (Vehiculo v : mapaVehiculos.values()) {
+    public static void listarVehiculos() {
+        System.out.println("\n📦 Vehículos de carga:");
+        for (Vehiculo v : vehiculos) {
             if (v instanceof VehiculoCarga) {
-                carga.add(v);
+                System.out.println(v);
             }
         }
-        return carga;
-    }
-
-    public List<Vehiculo> obtenerVehiculosPasajeros() {
-        List<Vehiculo> pasajeros = new ArrayList<>();
-        for (Vehiculo v : mapaVehiculos.values()) {
+        System.out.println("\n🚐 Vehículos de pasajeros:");
+        for (Vehiculo v : vehiculos) {
             if (v instanceof VehiculosPasajeros) {
-                pasajeros.add(v);
+                System.out.println(v);
             }
         }
-        return pasajeros;
     }
 
-    public void guardarEnArchivo(String ruta) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta))) {
-            for (Vehiculo v : mapaVehiculos.values()) {
+    public static void mostrarBoletas() {
+        for (Vehiculo v : vehiculos) {
+            System.out.println("\nBoleta para patente " + v.getPatente());
+            System.out.println("Días de arriendo: " + v.getDiasArriendo());
+            System.out.println("Total a pagar: $" + v.calcularMonto() + " CLP");
+        }
+    }
+
+    public static int contarLargosArriendos() {
+        int count = 0;
+        for (Vehiculo v : vehiculos) {
+            if (v.getDiasArriendo() >= 7) count++;
+        }
+        return count;
+    }
+
+    private static void guardarEnArchivo() {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA))) {
+            for (Vehiculo v : vehiculos) {
                 if (v instanceof VehiculoCarga) {
                     VehiculoCarga vc = (VehiculoCarga) v;
-                    writer.write("CARGA," + vc.getPatente() + "," + vc.getCapacidadCarga() + "," + vc.getDiasArriendo());
+                    bw.write("CARGA," + vc.getPatente() + "," + vc.getCapacidadCarga() + "," + vc.getDiasArriendo());
                 } else if (v instanceof VehiculosPasajeros) {
                     VehiculosPasajeros vp = (VehiculosPasajeros) v;
-                    writer.write("PASAJEROS," + vp.getPatente() + "," + vp.getNumPasajeros() + "," + vp.getDiasArriendo());
+                    bw.write("PASAJEROS," + vp.getPatente() + "," + vp.getMaxPasajeros() + "," + vp.getDiasArriendo());
                 }
-                writer.newLine();
+                bw.newLine();
             }
-            System.out.println("✅ Vehículos guardados exitosamente en archivo.");
         } catch (IOException e) {
-            System.out.println("❌ Error al guardar archivo: " + e.getMessage());
+            System.out.println("Error al guardar vehículos: " + e.getMessage());
         }
     }
 
-    public void cargarDesdeArchivo(String ruta) {
-        File archivo = new File(ruta);
-        if (!archivo.exists()) {
-            System.out.println("⚠️ Archivo no encontrado: " + ruta);
-            return;
-        }
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(ruta))) {
+    private static void cargarDesdeArchivo() {
+        try (BufferedReader br = new BufferedReader(new FileReader(RUTA))) {
             String linea;
-            while ((linea = reader.readLine()) != null) {
-                String[] partes = linea.split(",");
-                if (partes.length < 4) continue;
-
-                String tipo = partes[0];
-                String patente = partes[1];
-                int valor1 = Integer.parseInt(partes[2]); // capacidad o numPasajeros
-                int dias = Integer.parseInt(partes[3]);
-
-                Vehiculo v = null;
-
-                if (tipo.equalsIgnoreCase("CARGA")) {
-                    v = new VehiculoCarga(patente, valor1, dias);
-                } else if (tipo.equalsIgnoreCase("PASAJEROS")) {
-                    v = new VehiculosPasajeros(patente, valor1, dias);
-                }
-
-                if (v != null) {
-                    this.agregarVehiculo(v); // ya valida duplicados
+            while ((linea = br.readLine()) != null) {
+                String[] datos = linea.split(",");
+                if (datos[0].equals("CARGA")) {
+                    agregarVehiculo(new VehiculoCarga(datos[1], Integer.parseInt(datos[2]), Integer.parseInt(datos[3])));
+                } else if (datos[0].equals("PASAJEROS")) {
+                    agregarVehiculo(new VehiculosPasajeros(datos[1], Integer.parseInt(datos[2]), Integer.parseInt(datos[3])));
                 }
             }
-            System.out.println("✅ Vehículos cargados exitosamente desde archivo.");
-        } catch (IOException | NumberFormatException e) {
-            System.out.println("❌ Error al leer archivo: " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println("Archivo no encontrado o vacío.");
         }
     }
 }

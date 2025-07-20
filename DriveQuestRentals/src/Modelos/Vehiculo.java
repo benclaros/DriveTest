@@ -27,19 +27,7 @@ public abstract class Vehiculo {
         this.diasArriendo = diasArriendo;
     }
 
-    public abstract void mostrarDatos();
+    public abstract int calcularMonto();
 
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof Vehiculo) {
-            Vehiculo otro = (Vehiculo) obj;
-            return this.patente.equalsIgnoreCase(otro.patente);
-        }
-        return false;
-    }
-
-    @Override
-    public int hashCode() {
-        return patente.hashCode();
-    }
+    public abstract String toString();
 }
