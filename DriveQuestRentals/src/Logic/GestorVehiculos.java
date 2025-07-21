@@ -1,90 +1,91 @@
-package gestor;
+package logic;
 
-import model.*;
-import java.util.*;
+import modelos.*;
 import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GestorVehiculos {
-    private static List<Vehiculo> vehiculos = Collections.synchronizedList(new ArrayList<>());
-    private static Set<String> patentesRegistradas = new HashSet<>();
-    private static final String RUTA = "vehiculos.txt";
+    private Map<String, Vehiculo> mapaVehiculos;
 
-    static {
-        cargarDesdeArchivo();
+    public GestorVehiculos() {
+        this.mapaVehiculos = new ConcurrentHashMap<>();
     }
 
-    public static boolean agregarVehiculo(Vehiculo v) {
-        if (patentesRegistradas.contains(v.getPatente())) {
-            System.out.println("ERROR: Patente duplicada.");
+    public synchronized boolean agregarVehiculo(Vehiculo v) {
+        if (mapaVehiculos.containsKey(v.getPatente())) {
+            System.out.println("❌ Error: La patente ya está registrada.");
             return false;
         }
-        vehiculos.add(v);
-        patentesRegistradas.add(v.getPatente());
-        guardarEnArchivo();
+        mapaVehiculos.put(v.getPatente(), v);
         return true;
     }
 
-    public static void listarVehiculos() {
-        System.out.println("\n📦 Vehículos de carga:");
-        for (Vehiculo v : vehiculos) {
-            if (v instanceof VehiculoCarga) {
-                System.out.println(v);
-            }
-        }
-        System.out.println("\n🚐 Vehículos de pasajeros:");
-        for (Vehiculo v : vehiculos) {
-            if (v instanceof VehiculosPasajeros) {
-                System.out.println(v);
-            }
-        }
+    public Collection<Vehiculo> obtenerVehiculos() {
+        return mapaVehiculos.values();
     }
 
-    public static void mostrarBoletas() {
-        for (Vehiculo v : vehiculos) {
-            System.out.println("\nBoleta para patente " + v.getPatente());
-            System.out.println("Días de arriendo: " + v.getDiasArriendo());
-            System.out.println("Total a pagar: $" + v.calcularMonto() + " CLP");
-        }
-    }
-
-    public static int contarLargosArriendos() {
-        int count = 0;
-        for (Vehiculo v : vehiculos) {
-            if (v.getDiasArriendo() >= 7) count++;
-        }
-        return count;
-    }
-
-    private static void guardarEnArchivo() {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA))) {
-            for (Vehiculo v : vehiculos) {
-                if (v instanceof VehiculoCarga) {
-                    VehiculoCarga vc = (VehiculoCarga) v;
-                    bw.write("CARGA," + vc.getPatente() + "," + vc.getCapacidadCarga() + "," + vc.getDiasArriendo());
-                } else if (v instanceof VehiculosPasajeros) {
-                    VehiculosPasajeros vp = (VehiculosPasajeros) v;
-                    bw.write("PASAJEROS," + vp.getPatente() + "," + vp.getMaxPasajeros() + "," + vp.getDiasArriendo());
+    public void guardarEnArchivo(String ruta) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(ruta))) {
+            for (Vehiculo v : mapaVehiculos.values()) {
+                if (v instanceof VehiculoCarga vc) {
+                    writer.write("CARGA," + vc.getPatente() + "," + vc.getCapacidadCarga() + "," + vc.getDiasArriendo());
+                } else if (v instanceof VehiculosPasajeros vp) {
+                    writer.write("PASAJEROS," + vp.getPatente() + "," + vp.getNumPasajeros() + "," + vp.getDiasArriendo());
                 }
-                bw.newLine();
+                writer.newLine();
             }
+            System.out.println("✅ Vehículos guardados exitosamente en archivo.");
         } catch (IOException e) {
-            System.out.println("Error al guardar vehículos: " + e.getMessage());
+            System.out.println("❌ Error al guardar archivo: " + e.getMessage());
         }
     }
 
-    private static void cargarDesdeArchivo() {
-        try (BufferedReader br = new BufferedReader(new FileReader(RUTA))) {
-            String linea;
-            while ((linea = br.readLine()) != null) {
-                String[] datos = linea.split(",");
-                if (datos[0].equals("CARGA")) {
-                    agregarVehiculo(new VehiculoCarga(datos[1], Integer.parseInt(datos[2]), Integer.parseInt(datos[3])));
-                } else if (datos[0].equals("PASAJEROS")) {
-                    agregarVehiculo(new VehiculosPasajeros(datos[1], Integer.parseInt(datos[2]), Integer.parseInt(datos[3])));
-                }
+    public void cargarDesdeArchivoConHilo(String ruta) {
+        Thread hilo = new Thread(() -> {
+            File archivo = new File(ruta);
+            if (!archivo.exists()) {
+                System.out.println("⚠️ Archivo no encontrado: " + ruta);
+                return;
             }
-        } catch (IOException e) {
-            System.out.println("Archivo no encontrado o vacío.");
+            try (BufferedReader reader = new BufferedReader(new FileReader(ruta))) {
+                String linea;
+                while ((linea = reader.readLine()) != null) {
+                    String[] partes = linea.split(",");
+                    if (partes.length < 4) continue;
+
+                    String tipo = partes[0];
+                    String patente = partes[1];
+                    int valor1 = Integer.parseInt(partes[2]);
+                    int dias = Integer.parseInt(partes[3]);
+
+                    Vehiculo v = switch (tipo.toUpperCase()) {
+                        case "CARGA" -> new VehiculoCarga(patente, valor1, dias);
+                        case "PASAJEROS" -> new VehiculosPasajeros(patente, valor1, dias);
+                        default -> null;
+                    };
+
+                    if (v != null) {
+                        this.agregarVehiculo(v);
+                    }
+                }
+                System.out.println("✅ Vehículos cargados (hilo concurrente).");
+            } catch (IOException | NumberFormatException e) {
+                System.out.println("❌ Error al leer archivo: " + e.getMessage());
+            }
+        });
+        hilo.start();
+    }
+
+    public void mostrarBoletas() {
+        if (mapaVehiculos.isEmpty()) {
+            System.out.println("⚠️ No hay vehículos registrados.");
+            return;
+        }
+        for (Vehiculo v : mapaVehiculos.values()) {
+            System.out.println("=== BOLETA DE ARRIENDO ===");
+            System.out.println(v);
+            System.out.println("==========================\n");
         }
     }
 }

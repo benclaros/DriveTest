@@ -1,1 +1,1 @@
-model.VehiculoCarga
+modelos.VehiculoCarga

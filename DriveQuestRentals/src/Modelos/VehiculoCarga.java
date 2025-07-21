@@ -1,11 +1,7 @@
-package model;
+package modelos;
 
-public class VehiculoCarga extends Vehiculo {
-    private int capacidadCarga; // en kilos
-    private static final double VALOR_DIA = 35000;
-    private static final double DESCUENTO = 0.07;
-
-    public VehiculoCarga() {}
+public class VehiculoCarga extends Vehiculo implements Calculable {
+    private int capacidadCarga;
 
     public VehiculoCarga(String patente, int capacidadCarga, int diasArriendo) {
         super(patente, diasArriendo);
@@ -21,18 +17,12 @@ public class VehiculoCarga extends Vehiculo {
     }
 
     @Override
-    public int calcularMonto() {
-        double bruto = VALOR_DIA * diasArriendo;
-        double descuento = bruto * DESCUENTO;
-        double neto = bruto - descuento;
-        double iva = neto * 0.19;
-        return (int)(neto + iva);
+    public double calcularCostoArriendo() {
+        return getDiasArriendo() * (capacidadCarga * 0.5);
     }
 
     @Override
     public String toString() {
-        return "Vehículo de Carga - Patente: " + patente +
-               ", Capacidad: " + capacidadCarga + " kg" +
-               ", Días: " + diasArriendo;
+        return "[CARGA] " + super.toString() + ", Capacidad: " + capacidadCarga + "kg, Costo: $" + calcularCostoArriendo();
     }
 }

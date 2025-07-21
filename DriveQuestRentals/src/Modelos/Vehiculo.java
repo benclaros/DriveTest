@@ -1,12 +1,13 @@
-package model;
+package modelos;
 
 public abstract class Vehiculo {
-    protected String patente;
-    protected int diasArriendo;
-
-    public Vehiculo() {}
+    private String patente;
+    private int diasArriendo;
 
     public Vehiculo(String patente, int diasArriendo) {
+        if (patente == null || patente.isEmpty()) {
+            throw new IllegalArgumentException("La patente no puede estar vacía");
+        }
         this.patente = patente;
         this.diasArriendo = diasArriendo;
     }
@@ -16,6 +17,9 @@ public abstract class Vehiculo {
     }
 
     public void setPatente(String patente) {
+        if (patente == null || patente.isEmpty()) {
+            throw new IllegalArgumentException("La patente no puede estar vacía");
+        }
         this.patente = patente;
     }
 
@@ -24,10 +28,14 @@ public abstract class Vehiculo {
     }
 
     public void setDiasArriendo(int diasArriendo) {
+        if (diasArriendo <= 0) {
+            throw new IllegalArgumentException("Los días de arriendo deben ser mayores a 0");
+        }
         this.diasArriendo = diasArriendo;
     }
 
-    public abstract int calcularMonto();
-
-    public abstract String toString();
+    @Override
+    public String toString() {
+        return "Patente: " + patente + ", Días de arriendo: " + diasArriendo;
+    }
 }

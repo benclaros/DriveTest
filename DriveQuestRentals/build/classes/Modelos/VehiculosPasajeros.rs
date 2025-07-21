@@ -1,1 +1,1 @@
-model.VehiculosPasajeros
+modelos.VehiculosPasajeros
